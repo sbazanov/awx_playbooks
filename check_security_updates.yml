@@ -1,30 +1,42 @@
 ---
-- name: Check for RHEL security advisories and format the output
+- name: Check for RHEL security advisories and save to a file
   hosts: all
   become: yes
   tasks:
-    - name: Run dnf updateinfo to get a list of security updates
+    - name: Run dnf updateinfo to list security updates
       ansible.builtin.command: dnf updateinfo list updates security
       register: dnf_output
       ignore_errors: yes
       changed_when: false
 
-    - name: Set a fact for advisories found
-      ansible.builtin.set_fact:
-        advisories_found: "{{ dnf_output.stdout | length > 0 }}"
+    - name: Ensure the logs directory exists on the controller
+      ansible.builtin.file:
+        path: "reports/{{ inventory_hostname }}"
+        state: directory
+        mode: '0755'
+      run_once: true
+      delegate_to: localhost
 
-    - name: Format and display the security advisories
+    - name: Save dnf output to a local file
+      ansible.builtin.copy:
+        content: "{{ dnf_output.stdout }}"
+        dest: "reports/{{ inventory_hostname }}/security_advisories_{{ ansible_date_time.iso8601 }}.txt"
+      delegate_to: localhost
+      when: dnf_output.stdout | length > 0
+
+    - name: Read and display the generated file
+      ansible.builtin.slurp:
+        src: "reports/{{ inventory_hostname }}/security_advisories_{{ ansible_date_time.iso8601 }}.txt"
+      register: file_content
+      delegate_to: localhost
+      when: dnf_output.stdout | length > 0
+    
+    - name: Print the file content
       ansible.builtin.debug:
-        msg: |
-          RHEL Security Advisories Found:
-          {% for line in dnf_output.stdout_lines %}
-          - Advisory: {{ line.split()[0] }}
-            Severity: {{ line.split()[1] }}
-            Packages: {{ ' '.join(line.split()[2:]) }}
-          {% endfor %}
-      when: advisories_found
+        msg: "{{ file_content['content'] | b64decode }}"
+      when: file_content is defined
 
     - name: No security advisories found
       ansible.builtin.debug:
-        msg: "✅ No new security advisories found on the system. The system is up to date."
-      when: not advisories_found
+        msg: "✅ No new security advisories found on the system. No report generated."
+      when: dnf_output.stdout | length == 0
