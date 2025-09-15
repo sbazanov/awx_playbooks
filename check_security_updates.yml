@@ -1,19 +1,52 @@
 ---
-- name: Check for RHEL security updates
-  hosts: all
+- name: Check for RHEL security advisories and sort by severity
+  hosts: your_target_hosts
   become: yes
+  vars:
+    severity_order:
+      - Critical
+      - Important
+      - Moderate
+      - Low
+
   tasks:
-    - name: Run dnf updateinfo to list security updates
+    - name: Run dnf updateinfo to get a list of security updates
       ansible.builtin.command: dnf updateinfo list updates security
-      register: security_updates_output
+      register: dnf_output
       ignore_errors: yes
+      changed_when: false
 
-    - name: Display security updates
-      ansible.builtin.debug:
-        msg: "Available Security Updates:\n{{ security_updates_output.stdout }}"
-      when: security_updates_output.stdout | length > 0
+    - name: Parse and sort advisories
+      ansible.builtin.set_fact:
+        parsed_advisories: >
+          {% set advisories = [] %}
+          {% for line in dnf_output.stdout_lines %}
+            {% set parts = line.split() %}
+            {% set advisory = {
+              'advisory_id': parts[0],
+              'severity': parts[1].split('/')[0],
+              'packages': parts[2:],
+              'full_line': line
+            } %}
+            {% set advisories = advisories + [advisory] %}
+          {% endfor %}
+          {% if advisories|length > 0 %}
+          {{ advisories | sort(attribute='severity', reverse=True, by_custom_list=severity_order) }}
+          {% else %}
+          []
+          {% endif %}
 
-    - name: No security updates found
+    - name: Display sorted security advisories
       ansible.builtin.debug:
-        msg: "No security updates found on the system."
-      when: security_updates_output.stdout | length == 0
+        msg: |
+          RHEL Security Advisories Found (Sorted by Severity):
+          {% if parsed_advisories | length > 0 %}
+          {% for item in parsed_advisories %}
+          - **Advisory ID**: {{ item.advisory_id }}
+            **Severity**: {{ item.severity }}
+            **Packages**: {{ item.packages | join(' ') }}
+          {% endfor %}
+          {% else %}
+          ✅ No new security advisories found on the system. The system is up to date.
+          {% endif %}
+      when: parsed_advisories is defined
