@@ -1,0 +1,19 @@
+---
+- name: Check for RHEL security updates
+  hosts: all
+  become: yes
+  tasks:
+    - name: Run dnf updateinfo to list security updates
+      ansible.builtin.command: dnf updateinfo list updates security
+      register: security_updates_output
+      ignore_errors: yes
+
+    - name: Display security updates
+      ansible.builtin.debug:
+        msg: "Available Security Updates:\n{{ security_updates_output.stdout }}"
+      when: security_updates_output.stdout | length > 0
+
+    - name: No security updates found
+      ansible.builtin.debug:
+        msg: "No security updates found on the system."
+      when: security_updates_output.stdout | length == 0
