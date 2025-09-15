@@ -15,7 +15,6 @@
       ansible.builtin.command: dnf updateinfo list updates security
       register: dnf_output
       ignore_errors: yes
-      warn: false
       changed_when: false
 
     - name: Count advisories by severity
