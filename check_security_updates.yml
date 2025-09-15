@@ -34,5 +34,5 @@
 
     - name: Display the total count of advisories
       ansible.builtin.debug:
-        msg: "Total Security Advisories Found: {{ dnf_output.stdout_lines | default([]) | length }}"
+        msg: "Total Security Advisories Found: {{ dnf_output }}"
       when: dnf_output is defined
