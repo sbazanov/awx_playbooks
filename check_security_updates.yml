@@ -1,42 +1,51 @@
 ---
-- name: Check for RHEL security advisories and save to a file
+- name: Count RHEL security advisories by severity
   hosts: all
   become: yes
+  vars:
+    # Define the desired order for severity levels
+    severity_order:
+      - Critical
+      - Important
+      - Moderate
+      - Low
+
   tasks:
-    - name: Run dnf updateinfo to list security updates
+    - name: Run dnf updateinfo to get a list of security updates
       ansible.builtin.command: dnf updateinfo list updates security
       register: dnf_output
       ignore_errors: yes
       changed_when: false
 
-    - name: Ensure the logs directory exists on the controller
-      ansible.builtin.file:
-        path: "reports/{{ inventory_hostname }}"
-        state: directory
-        mode: '0755'
-      run_once: true
-      delegate_to: localhost
+    - name: Count advisories by severity
+      ansible.builtin.set_fact:
+        advisory_counts: >
+          {% set counts = {} %}
+          {% if dnf_output.stdout_lines | default([]) | length > 0 %}
+            {% for line in dnf_output.stdout_lines %}
+              {% set parts = line.split() %}
+              {% if parts | length >= 2 %}
+                {% set severity = parts[1].split('/')[0] %}
+                {% set counts = counts | combine({severity: counts.get(severity, 0) + 1}) %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ counts }}
 
-    - name: Save dnf output to a local file
-      ansible.builtin.copy:
-        content: "{{ dnf_output.stdout }}"
-        dest: "reports/{{ inventory_hostname }}/security_advisories_{{ ansible_date_time.iso8601 }}.txt"
-      delegate_to: localhost
-      when: dnf_output.stdout | length > 0
-
-    - name: Read and display the generated file
-      ansible.builtin.slurp:
-        src: "reports/{{ inventory_hostname }}/security_advisories_{{ ansible_date_time.iso8601 }}.txt"
-      register: file_content
-      delegate_to: localhost
-      when: dnf_output.stdout | length > 0
-    
-    - name: Print the file content
+    - name: Display the total count of advisories
       ansible.builtin.debug:
-        msg: "{{ file_content['content'] | b64decode }}"
-      when: file_content is defined
+        msg: "Total Security Advisories Found: {{ dnf_output.stdout_lines | length }}"
 
-    - name: No security advisories found
+    - name: Display advisory counts by severity (sorted)
       ansible.builtin.debug:
-        msg: "✅ No new security advisories found on the system. No report generated."
-      when: dnf_output.stdout | length == 0
+        msg: |
+          Security Advisories by Severity:
+          {% if advisory_counts | length > 0 %}
+            {% for severity in severity_order %}
+              {% if advisory_counts.get(severity) %}
+          - {{ severity }}: {{ advisory_counts[severity] }}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+          ✅ No security advisories found.
+          {% endif %}
