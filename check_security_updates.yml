@@ -12,7 +12,7 @@
 
   tasks:
     - name: Run dnf updateinfo to get a list of security updates
-      ansible.builtin.command: {{ sudo dnf updateinfo list updates security | grep 'Important' | wc -l }}
+      ansible.builtin.command: " sudo dnf updateinfo list updates security | grep 'Important' | wc -l "
       register: dnf_output
       ignore_errors: yes
       changed_when: false
