@@ -37,17 +37,17 @@
         msg: "Total Security Advisories Found: {{ dnf_output.stdout_lines | default([]) | length }}"
       when: dnf_output is defined
 
-    - name: Display advisory counts by severity (sorted)
-      ansible.builtin.debug:
-        msg: |
-          Security Advisories by Severity:
-          {% if advisory_counts is defined and advisory_counts | length > 0 %}
-            {% for severity in severity_order %}
-              {% if advisory_counts.get(severity) %}
-          - {{ severity }}: {{ advisory_counts[severity] }}
-              {% endif %}
-            {% endfor %}
-          {% else %}
-          ✅ No security advisories found.
-          {% endif %}
-      when: advisory_counts is defined
+   # - name: Display advisory counts by severity (sorted)
+   #   ansible.builtin.debug:
+   #     msg: |
+   #       Security Advisories by Severity:
+   #       {% if advisory_counts is defined and advisory_counts | length > 0 %}
+   #         {% for severity in severity_order %}
+   #          {% if advisory_counts.get(severity) %}
+   #       - {{ severity }}: {{ advisory_counts[severity] }}
+   #           {% endif %}
+   #         {% endfor %}
+   #       {% else %}
+   #       ✅ No security advisories found.
+   #       {% endif %}
+   #   when: advisory_counts is defined
