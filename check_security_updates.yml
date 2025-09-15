@@ -1,53 +1,33 @@
 ---
-- name: Count RHEL security advisories by severity
+- name: Count security advisories by severity
   hosts: all
   become: yes
   vars:
-    # Define the desired order for severity levels
-    severity_order:
+    severities:
       - Critical
       - Important
       - Moderate
       - Low
 
   tasks:
-    - name: Run dnf updateinfo to get a list of security updates
-      ansible.builtin.command: dnf updateinfo list updates security
-      register: dnf_output
-      ignore_errors: yes
+    - name: Get advisory counts for each severity
+      ansible.builtin.shell: |
+        declare -A counts
+        for severity in "{{ severities | join(' ') }}"; do
+          count=$(dnf updateinfo list updates security | grep -c "$severity")
+          counts["$severity"]=$count
+        done
+        for severity in "${!counts[@]}"; do
+          echo "$severity:${counts[$severity]}"
+        done
+      register: advisory_counts
       changed_when: false
 
-    - name: Count advisories by severity
-      ansible.builtin.set_fact:
-        advisory_counts: >
-          {% set counts = {} %}
-          {% if dnf_output.stdout_lines | default([]) | length > 0 %}
-            {% for line in dnf_output.stdout_lines %}
-              {% set parts = line.split() %}
-              {% if parts | length >= 2 %}
-                {% set severity = parts[1].split('/')[0] %}
-                {% set counts = counts | combine({severity: counts.get(severity, 0) + 1}) %}
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-          {{ counts }}
-
-    - name: Display the total count of advisories
+    - name: Display advisory counts
       ansible.builtin.debug:
-        msg: "Total Security Advisories Found: {{ dnf_output.stdout_lines | default([]) | length }}"
-      when: dnf_output is defined
-
-   # - name: Display advisory counts by severity (sorted)
-   #   ansible.builtin.debug:
-   #     msg: |
-   #       Security Advisories by Severity:
-   #       {% if advisory_counts is defined and advisory_counts | length > 0 %}
-   #         {% for severity in severity_order %}
-   #          {% if advisory_counts.get(severity) %}
-   #       - {{ severity }}: {{ advisory_counts[severity] }}
-   #           {% endif %}
-   #         {% endfor %}
-   #       {% else %}
-   #       ✅ No security advisories found.
-   #       {% endif %}
-   #   when: advisory_counts is defined
+        msg: |
+          Security Advisories by Severity:
+          {% for line in advisory_counts.stdout_lines %}
+            {% set parts = line.split(':') %}
+            - {{ parts[0] }}: {{ parts[1] }}
+          {% endfor %}
