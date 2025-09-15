@@ -1,6 +1,6 @@
 ---
 - name: Check for RHEL security advisories and sort by severity
-  hosts: your_target_hosts
+  hosts: all
   become: yes
   vars:
     severity_order:
