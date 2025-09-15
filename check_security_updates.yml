@@ -12,25 +12,11 @@
 
   tasks:
     - name: Run dnf updateinfo to get a list of security updates
-      ansible.builtin.command: dnf updateinfo list updates security | grep 'Important' | wc -l
+      ansible.builtin.command: | dnf updateinfo list updates security | grep 'Important' | wc -l
       register: dnf_output
       ignore_errors: yes
       changed_when: false
 
-    - name: Count advisories by severity
-      ansible.builtin.set_fact:
-        advisory_counts: >
-          {% set counts = {} %}
-          {% if dnf_output.stdout_lines | default([]) | length > 0 %}
-            {% for line in dnf_output.stdout_lines %}
-              {% set parts = line.split() %}
-              {% if parts | length >= 2 %}
-                {% set severity = parts[1].split('/')[0] %}
-                {% set counts = counts | combine({severity: counts.get(severity, 0) + 1}) %}
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-          {{ counts }}
 
     - name: Display the total count of advisories
       ansible.builtin.debug:
