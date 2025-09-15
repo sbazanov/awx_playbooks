@@ -20,20 +20,22 @@
       ansible.builtin.set_fact:
         parsed_advisories: >
           {% set advisories = [] %}
-          {% for line in dnf_output.stdout_lines %}
-            {% set parts = line.split() %}
-            {% set advisory = {
-              'advisory_id': parts[0],
-              'severity': parts[1].split('/')[0],
-              'packages': parts[2:],
-              'full_line': line
-            } %}
-            {% set advisories = advisories + [advisory] %}
-          {% endfor %}
+          {% if dnf_output.stdout_lines %}
+            {% for line in dnf_output.stdout_lines %}
+              {% set parts = line.split() %}
+              {% set advisory = {
+                'advisory_id': parts[0],
+                'severity': parts[1].split('/')[0],
+                'packages': parts[2:],
+                'full_line': line
+              } %}
+              {% set advisories = advisories + [advisory] %}
+            {% endfor %}
+          {% endif %}
           {% if advisories|length > 0 %}
-          {{ advisories | sort(attribute='severity', reverse=True, by_custom_list=severity_order) }}
+            {{ advisories | sort(attribute='severity', reverse=True, by_custom_list=severity_order) }}
           {% else %}
-          []
+            []
           {% endif %}
 
     - name: Display sorted security advisories
