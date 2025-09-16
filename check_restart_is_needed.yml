@@ -1,0 +1,22 @@
+---
+- name: Check for services that need to be restarted
+  hosts: all
+  become: yes
+  tasks:
+    - name: Run dnf needs-restarting to check for updated libraries
+      ansible.builtin.command: dnf needs-restarting
+      register: restart_check
+      ignore_errors: yes
+      changed_when: restart_check.stdout | length > 0
+
+    - name: Display processes or services to be restarted
+      ansible.builtin.debug:
+        msg: |
+          The following services or processes need to be restarted to fully apply updates:
+          {{ restart_check.stdout }}
+      when: restart_check.stdout | length > 0
+
+    - name: No restarts needed
+      ansible.builtin.debug:
+        msg: "✅ No restarts needed. All updates have been fully applied."
+      when: restart_check.stdout | length == 0
