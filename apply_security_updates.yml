@@ -1,0 +1,38 @@
+---
+- name: Apply security updates on RHEL 9 systems
+  hosts: all
+  become: yes
+  tasks:
+    - name: Apply all available security updates
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        security: yes
+        bugfix: yes
+      register: dnf_result
+
+    - name: Display update results
+      ansible.builtin.debug:
+        msg: |
+          Update status: {{ dnf_result.msg }}
+          Packages updated: {{ dnf_result.changed_packages | default('None') }}
+          Total packages: {{ dnf_result.results | length }}
+      when: dnf_result is defined and dnf_result.results is defined and dnf_result.results | length > 0
+
+    - name: No security updates found
+      ansible.builtin.debug:
+        msg: "✅ No security updates were applied. System is up to date."
+      when: dnf_result is defined and dnf_result.results is defined and dnf_result.results | length == 0
+
+    - name: Check for services that need to be restarted
+      ansible.builtin.command: dnf needs-restarting
+      register: needs_restarting_output
+      changed_when: needs_restarting_output.stdout | length > 0
+      ignore_errors: yes
+
+    - name: Display services to be restarted
+      ansible.builtin.debug:
+        msg: |
+          The following services or processes need to be restarted:
+          {{ needs_restarting_output.stdout }}
+      when: needs_restarting_output.stdout | length > 0
